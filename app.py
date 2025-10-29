@@ -29,7 +29,16 @@ st.markdown(
 def load_data(path=DATA_PATH):
     if not os.path.exists(path):
         raise FileNotFoundError(f"O arquivo '{path}' não foi encontrado.")
-    df = pd.read_csv(path, sep="\t")  # CSV separado por tabulação
+    # Tenta ler como tabulação e depois vírgula
+    try:
+        df = pd.read_csv(path, sep="\t")
+        if TARGET_COL not in df.columns:
+            # tenta vírgula se não encontrou a coluna alvo
+            df = pd.read_csv(path, sep=",")
+    except Exception:
+        df = pd.read_csv(path, sep=",")
+    # Remove espaços extras dos nomes das colunas
+    df.columns = df.columns.str.strip()
     return df
 
 # ---------------------------------------------
@@ -70,10 +79,16 @@ except FileNotFoundError as e:
     st.error(str(e))
     st.stop()
 
+# Verifica se a coluna alvo existe
+if TARGET_COL not in df.columns:
+    st.error(f"A coluna '{TARGET_COL}' não foi encontrada no CSV. Verifique o arquivo.")
+    st.write("Colunas disponíveis:", df.columns.tolist())
+    st.stop()
+
 st.subheader("📊 Amostra dos dados")
 st.dataframe(df.head(10))
 
-fig = px.histogram(df, x=TARGET_COL, title="Distribuição da variável alvo (class)")
+fig = px.histogram(df, x=TARGET_COL, title=f"Distribuição da variável alvo ({TARGET_COL})")
 st.plotly_chart(fig, use_container_width=True)
 
 # ---------------------------------------------
