@@ -10,6 +10,18 @@ import numpy as np
 
 DATA_PATH = "mushroom.csv"
 TARGET_COL = "class"
+FEATURE_COLUMNS = [
+    "bruises",
+    "odor",
+    "gill-size",
+    "gill-color",
+    "stalk-shape",
+    "stalk-root",
+    "stalk-color-above-ring",
+    "spore-print-color",
+    "population",
+    "habitat"
+]
 
 st.set_page_config(page_title="Mushroom IA - Classificação", layout="wide")
 
@@ -59,11 +71,10 @@ def preprocess(df, target_col=TARGET_COL):
     return X_proc, y_enc, encoders, target_le
 
 def build_sidebar_inputs(df, encoders):
-    st.sidebar.header("Características do cogumelo para prever")
+    st.sidebar.header("Preencha as características do cogumelo")
     inputs = {}
-    X = df.drop(columns=[TARGET_COL])
-    for col in X.columns:
-        ser = X[col]
+    for col in FEATURE_COLUMNS:
+        ser = df[col]
         if is_boolean_like(ser):
             most_common = ser.mode().iloc[0] if not ser.mode().empty else None
             default = False
@@ -96,8 +107,9 @@ except FileNotFoundError as e:
     st.error(str(e))
     st.stop()
 
-st.subheader("Amostra dos dados (10 primeiras linhas)")
-st.dataframe(df.head(10))
+# Mostrar apenas as 10 colunas selecionadas
+st.subheader("Amostra das colunas de previsão (10 primeiras linhas)")
+st.dataframe(df[FEATURE_COLUMNS].head(10))
 
 with st.expander("Visão geral das colunas e tipos"):
     info = pd.DataFrame({
@@ -138,13 +150,12 @@ else:
         st.info("Clique em 'Treinar modelo agora' para treinar com os hiperparâmetros acima.")
 
 # Inputs para previsão
-# Inputs para previsão com botão
 if 'model' in st.session_state:
     model = st.session_state['model']
     user_inputs = build_sidebar_inputs(df, encoders)
 
     if st.button("Prever cogumelo"):
-        feature_vec = [user_inputs[c] if c in user_inputs else 0 for c in X_proc.columns]
+        feature_vec = [user_inputs[c] if c in user_inputs else 0 for c in FEATURE_COLUMNS]
         feature_arr = np.array(feature_vec).reshape(1, -1)
         pred = model.predict(feature_arr)[0]
         proba = model.predict_proba(feature_arr)[0] if hasattr(model,"predict_proba") else None
@@ -161,7 +172,6 @@ if 'model' in st.session_state:
             st.table(prob_df)
 else:
     st.info("Treine o modelo primeiro para habilitar previsões.")
-
 
 st.markdown("""---
 **Notas:**  
