@@ -24,13 +24,13 @@ def is_boolean_like(series):
     unique = set(series.dropna().unique())
     bool_like_sets = [
         {True, False},
-        {\"True\", \"False\"},
-        {\"true\", \"false\"},
+        {"True", "False"},
+        {"true", "false"},
         {0, 1},
-        {\"0\", \"1\"},
-        {\"t\", \"f\"},
-        {\"y\", \"n\"},
-        {\"yes\", \"no\"}
+        {"0", "1"},
+        {"t", "f"},
+        {"y", "n"},
+        {"yes", "no"}
     ]
     for s in bool_like_sets:
         if unique.issubset(s):
