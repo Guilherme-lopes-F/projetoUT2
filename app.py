@@ -26,14 +26,8 @@ def load_data(path=DATA_PATH):
 def is_boolean_like(series):
     unique = set(series.dropna().unique())
     bool_like_sets = [
-        {True, False},
-        {"True", "False"},
-        {"true", "false"},
-        {0, 1},
-        {"0", "1"},
-        {"t", "f"},
-        {"y", "n"},
-        {"yes", "no"}
+        {True, False}, {"True", "False"}, {"true", "false"},
+        {0,1}, {"0","1"}, {"t","f"}, {"y","n"}, {"yes","no"}
     ]
     for s in bool_like_sets:
         if unique.issubset(s):
@@ -49,13 +43,6 @@ def preprocess(df, target_col=TARGET_COL):
     for col in X.columns:
         ser = X[col]
         if is_boolean_like(ser):
-            try:
-                numeric = pd.to_numeric(ser.dropna())
-                if set(numeric.unique()).issubset({0,1}):
-                    X_proc[col] = ser.astype(int)
-                    continue
-            except Exception:
-                pass
             mapping_vals = {
                 True:1, False:0, 'True':1, 'False':0, 'true':1, 'false':0,
                 't':1,'f':0,'y':1,'n':0,'yes':1,'no':0,'1':1,'0':0
@@ -71,6 +58,37 @@ def preprocess(df, target_col=TARGET_COL):
 
     return X_proc, y_enc, encoders, target_le
 
+def build_sidebar_inputs(df, encoders):
+    st.sidebar.header("Características do cogumelo para prever")
+    inputs = {}
+    X = df.drop(columns=[TARGET_COL])
+    for col in X.columns:
+        ser = X[col]
+        if is_boolean_like(ser):
+            most_common = ser.mode().iloc[0] if not ser.mode().empty else None
+            default = False
+            if isinstance(most_common, (int,float)):
+                default = bool(most_common)
+            else:
+                default = str(most_common).lower() in ['true','t','y','yes','1']
+            val = st.sidebar.checkbox(f"{col} (boolean)", value=default)
+            inputs[col] = int(val)
+        else:
+            uniques = list(ser.dropna().unique())
+            uniques_str = [str(u) for u in uniques]
+            default = uniques_str[0] if uniques_str else ""
+            choice = st.sidebar.selectbox(f"{col}", options=uniques_str, index=0)
+            if col in encoders:
+                enc = encoders[col]
+                try:
+                    transformed = int(enc.transform([str(choice)])[0])
+                except Exception:
+                    transformed = 0
+            else:
+                transformed = 0
+            inputs[col] = transformed
+    return inputs
+
 # Load data
 try:
     df = load_data()
@@ -82,7 +100,11 @@ st.subheader("Amostra dos dados (5 primeiras linhas)")
 st.dataframe(df.head())
 
 with st.expander("Visão geral das colunas e tipos"):
-    info = pd.DataFrame({'coluna': df.columns, 'tipo': [str(t) for t in df.dtypes], 'valores_únicos': [df[c].nunique() for c in df.columns]})
+    info = pd.DataFrame({
+        'coluna': df.columns,
+        'tipo': [str(t) for t in df.dtypes],
+        'valores_únicos': [df[c].nunique() for c in df.columns]
+    })
     st.dataframe(info)
 
 if TARGET_COL in df.columns:
@@ -91,6 +113,7 @@ if TARGET_COL in df.columns:
 
 st.subheader("Treinamento do modelo")
 st.markdown("O app irá pré-processar automaticamente colunas char/bool e treinar um RandomForestClassifier.")
+
 X_proc, y_enc, encoders, target_le = preprocess(df, TARGET_COL)
 
 test_size = st.slider("Tamanho do conjunto de teste (%)", 5, 50, 20)
@@ -114,80 +137,31 @@ else:
     else:
         st.info("Clique em 'Treinar modelo agora' para treinar com os hiperparâmetros acima.")
 
-# === FORMULÁRIO CENTRAL DE PREDIÇÃO ===
+# Inputs para previsão
 if 'model' in st.session_state:
     model = st.session_state['model']
+    user_inputs = build_sidebar_inputs(df, encoders)
+    feature_vec = [user_inputs[c] if c in user_inputs else 0 for c in X_proc.columns]
+    feature_arr = np.array(feature_vec).reshape(1, -1)
+    pred = model.predict(feature_arr)[0]
+    proba = model.predict_proba(feature_arr)[0] if hasattr(model,"predict_proba") else None
+    pred_label = target_le.inverse_transform([pred])[0]
+    
+    st.subheader("Resultado da previsão")
+    if pred_label.lower().startswith('e'):
+        st.success(f"🍽️ Previsto: COMESTÍVEL (label = {pred_label})")
+    else:
+        st.error(f"☠️ Previsto: VENENOSO (label = {pred_label})")
+    
+    if proba is not None:
+        prob_df = pd.DataFrame({'classe': target_le.classes_, 'probabilidade': proba})
+        st.table(prob_df)
+else:
+    st.info("Treine o modelo primeiro para habilitar previsões.")
 
-    st.subheader("Formulário de classificação de fungos")
-    st.markdown("Responda todas as perguntas abaixo sobre o cogumelo e clique em 'Enviar para Análise'.")
-
-    with st.form("mushroom_form"):
-        q1 = st.radio("1) Escurece ao toque ou quando danificado (Bruises)?",
-                      options=[('Sim/Yes','t'), ('Não/No','f')])
-        q2 = st.radio("2) Odor?",
-                      options=[('Cheiro Forte /Pungent','p'), ('Amêndoas/Almond','a'), 
-                               ('Anis/Anise','l'), ('Nenhum/None','n'), ('Fétido/Foul','f'),
-                               ('Creosoto/Creosote','c'), ('Peixe/Fishy','y'), ('Apimentado/Spicy','s'),
-                               ('Mofo/Musty','m')])
-        q3 = st.radio("3) Tamanho das lâminas (gill-size)?",
-                      options=[('Estreitas/Narrow','n'), ('Largas/Broad','b')])
-        q4 = st.radio("4) Cor das lâminas (gill-color)?",
-                      options=[('Preta/Black','k'), ('Marrom/Brown','n'), ('Cinza/Gray','g'),
-                               ('Rosa/Pink','p'), ('Branca/White','w'), ('Chocolate','h'),
-                               ('Roxa/Purple','u'), ('Vermelha/Red','e'), ('Bege/Buff','b'),
-                               ('Verde/Green','r')])
-        q5 = st.radio("5) Formato do caule (stalk-shape):",
-                      options=[('Alargado na base/Enlarging','e'), ('Afunilando/Tapering','t')])
-        q6 = st.radio("6) Raiz do caule (stalk-root):",
-                      options=[('Uniforme/Equal','e'), ('Em forma de clava/Club','c'),
-                               ('Bulbosa/Bulbous','b'), ('Enraizada/Rooted','r')])
-        q7 = st.radio("7) Cor do caule acima do anel (stalk-color-above-ring)?",
-                      options=[('Branco/White','w'), ('Cinza/Gray','g'), ('Rosa/Pink','p'),
-                               ('Marrom/Brown','n'), ('Bege/Buff','b'), ('Vermelho/Red','e'),
-                               ('Laranja/Orange','o'), ('Canela/Cinnamon','c'), ('Amarelo/Yellow','y')])
-        q8 = st.radio("8) Cor do esporo (spore-print-color)?",
-                      options=[('Preto/Black','k'), ('Marrom/Brown','n'), ('Roxo/Purple','u'),
-                               ('Chocolate','h'), ('Branco/White','w'), ('Verde/Green','r'),
-                               ('Laranja/Oranje','o'), ('Amarelo/Yellow','y'), ('Bege/Buff','b')])
-        q9 = st.radio("9) Como é a população (population)?",
-                      options=[('Dispersa/Scattered','s'), ('Numerosa/Numerous','n'),
-                               ('Abundante/Abundant','a'), ('Várias/Several','v'),
-                               ('Solitária/Solitary','y'), ('Agrupada/Clustered','c')])
-        q10 = st.radio("10) Habitat (habitat)?",
-                      options=[('Urbano/Urban','u'), ('Gramados/Grasses','g'),
-                               ('Prados/Meadows','m'), ('Florestas/Woods','d'),
-                               ('Trilhas/Paths','p'), ('Terrenos baldios/Waste','w'),
-                               ('Folhas/Leaves','l')])
-
-        submitted = st.form_submit_button("Enviar para Análise")
-
-        if submitted:
-            user_inputs = {
-                'bruises': 1 if q1[1]=='t' else 0,
-                'odor': q2[1],
-                'gill-size': q3[1],
-                'gill-color': q4[1],
-                'stalk-shape': q5[1],
-                'stalk-root': q6[1],
-                'stalk-color-above-ring': q7[1],
-                'spore-print-color': q8[1],
-                'population': q9[1],
-                'habitat': q10[1]
-            }
-
-            feature_vec = []
-            for col in X_proc.columns:
-                val = user_inputs.get(col, 0)
-                if col in encoders:
-                    try:
-                        val = encoders[col].transform([str(val)])[0]
-                    except Exception:
-                        val = 0
-                feature_vec.append(val)
-            feature_arr = np.array(feature_vec).reshape(1, -1)
-
-            pred = model.predict(feature_arr)[0]
-            pred_label = target_le.inverse_transform([pred])[0]
-
-            if pred_label.lower().startswith('e'):
-                st.success(f"🍽️ Previsto: COMESTÍVEL
+st.markdown("""---
+**Notas:**  
+- O app detecta automaticamente colunas boolean-like e as converte para 0/1.  
+- Colunas char/categóricas são codificadas com LabelEncoder.  
+- Se quiser que eu salve o modelo em disco (`.joblib`), posso adicionar essa funcionalidade.
+""")
