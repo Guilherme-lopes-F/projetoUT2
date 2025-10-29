@@ -14,7 +14,10 @@ TARGET_COL = "class"
 st.set_page_config(page_title="Mushroom IA - Classificação", layout="wide")
 
 st.title("Mushroom IA — Previsão: Comestível ou Venenoso")
-st.markdown("App que carrega um dataset de cogumelos (`mushroom.csv`), treina um modelo dentro do app e permite prever se um cogumelo é comestível (e) ou venenoso (p).")
+st.markdown(
+    "App que carrega um dataset de cogumelos (`mushroom.csv`), "
+    "treina um modelo dentro do app e permite prever se um cogumelo é comestível (e) ou venenoso (p)."
+)
 
 @st.cache_data
 def load_data(path=DATA_PATH):
@@ -113,17 +116,26 @@ if TARGET_COL in df.columns:
 
 # Preprocess and train
 st.subheader("Treinamento do modelo")
-st.markdown("O app irá pré-processar automaticamente colunas char/bool e treinar um RandomForestClassifier.")
+st.markdown(
+    "O app irá pré-processar automaticamente colunas char/bool e treinar um RandomForestClassifier."
+)
 X_proc, y_enc, encoders, target_le = preprocess(df, TARGET_COL)
 
 test_size = st.slider("Tamanho do conjunto de teste (%)", 5, 50, 20)
-X_train, X_test, y_train, y_test = train_test_split(X_proc, y_enc, test_size=test_size/100.0, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(
+    X_proc, y_enc, test_size=test_size/100.0, random_state=42
+)
 
 n_estimators = st.number_input("Número de árvores (n_estimators)", min_value=10, max_value=1000, value=100, step=10)
 max_depth = st.number_input("Max depth (0 = None)", min_value=0, max_value=100, value=0, step=1)
 
 if st.button("Treinar modelo agora"):
-    rf = RandomForestClassifier(n_estimators=n_estimators, max_depth=(None if max_depth==0 else int(max_depth)), random_state=42)
+    rf = RandomForestClassifier(
+        n_estimators=n_estimators,
+        max_depth=(None if max_depth == 0 else int(max_depth)),
+        random_state=42,
+        class_weight='balanced'  # Corrige viés para prever venenosos
+    )
     rf.fit(X_train, y_train)
     preds = rf.predict(X_test)
     acc = accuracy_score(y_test, preds)
