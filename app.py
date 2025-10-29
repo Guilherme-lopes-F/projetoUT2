@@ -29,26 +29,12 @@ st.markdown(
 def load_data(path=DATA_PATH):
     if not os.path.exists(path):
         raise FileNotFoundError(f"O arquivo '{path}' não foi encontrado.")
-    try:
-        df = pd.read_csv(path, sep="\t")  # tenta com tab
-    except Exception:
-        df = pd.read_csv(path, sep=",")   # tenta com vírgula se falhar
+    df = pd.read_csv(path, sep="\t")  # CSV separado por tabulação
     return df
 
 # ---------------------------------------------
 # FUNÇÕES AUXILIARES
 # ---------------------------------------------
-def is_boolean_like(series):
-    unique = set(series.dropna().unique())
-    bool_like_sets = [
-        {True, False}, {"True", "False"}, {"true", "false"},
-        {0, 1}, {"0", "1"}, {"t", "f"}, {"y", "n"}, {"yes", "no"}
-    ]
-    for s in bool_like_sets:
-        if unique.issubset(s):
-            return True
-    return False
-
 def preprocess(df, target_col=TARGET_COL):
     encoders = {}
     X = df.drop(columns=[target_col])
@@ -56,9 +42,8 @@ def preprocess(df, target_col=TARGET_COL):
     X_proc = pd.DataFrame(index=X.index)
 
     for col in X.columns:
-        ser = X[col]
         le = LabelEncoder()
-        X_proc[col] = le.fit_transform(ser.astype(str))
+        X_proc[col] = le.fit_transform(X[col].astype(str))
         encoders[col] = le
 
     target_le = LabelEncoder()
@@ -108,7 +93,7 @@ if st.button("🚀 Treinar modelo agora"):
 
     rf = RandomForestClassifier(
         n_estimators=n_estimators,
-        max_depth=(None if max_depth == 0 else int(max_depth)),
+        max_depth=None if max_depth == 0 else int(max_depth),
         class_weight="balanced",
         random_state=42
     )
