@@ -10,18 +10,6 @@ import numpy as np
 
 DATA_PATH = "mushroom.csv"
 TARGET_COL = "class"
-FEATURE_COLUMNS = [
-    "bruises",
-    "odor",
-    "gill-size",
-    "gill-color",
-    "stalk-shape",
-    "stalk-root",
-    "stalk-color-above-ring",
-    "spore-print-color",
-    "population",
-    "habitat"
-]
 
 st.set_page_config(page_title="Mushroom IA - Classificação", layout="wide")
 
@@ -39,7 +27,7 @@ def is_boolean_like(series):
     unique = set(series.dropna().unique())
     bool_like_sets = [
         {True, False}, {"True", "False"}, {"true", "false"},
-        {0,1}, {"0","1"}, {"t","f"}, {"y","n"}, {"yes","no"}
+        {0, 1}, {"0", "1"}, {"t", "f"}, {"y", "n"}, {"yes", "no"}
     ]
     for s in bool_like_sets:
         if unique.issubset(s):
@@ -71,14 +59,15 @@ def preprocess(df, target_col=TARGET_COL):
     return X_proc, y_enc, encoders, target_le
 
 def build_sidebar_inputs(df, encoders):
-    st.sidebar.header("Preencha as características do cogumelo")
+    st.sidebar.header("Características do cogumelo para prever")
     inputs = {}
-    for col in FEATURE_COLUMNS:
-        ser = df[col]
+    X = df.drop(columns=[TARGET_COL])
+    for col in X.columns:
+        ser = X[col]
         if is_boolean_like(ser):
             most_common = ser.mode().iloc[0] if not ser.mode().empty else None
             default = False
-            if isinstance(most_common, (int,float)):
+            if isinstance(most_common, (int, float)):
                 default = bool(most_common)
             else:
                 default = str(most_common).lower() in ['true','t','y','yes','1']
@@ -107,9 +96,8 @@ except FileNotFoundError as e:
     st.error(str(e))
     st.stop()
 
-# Mostrar apenas as 10 colunas selecionadas
-st.subheader("Amostra das colunas de previsão (10 primeiras linhas)")
-st.dataframe(df[FEATURE_COLUMNS].head(10))
+st.subheader("Amostra dos dados (5 primeiras linhas)")
+st.dataframe(df.head())
 
 with st.expander("Visão geral das colunas e tipos"):
     info = pd.DataFrame({
@@ -123,9 +111,9 @@ if TARGET_COL in df.columns:
     fig = px.histogram(df, x=TARGET_COL, title="Distribuição da variável alvo (class)")
     st.plotly_chart(fig, use_container_width=True)
 
+# Preprocess and train
 st.subheader("Treinamento do modelo")
 st.markdown("O app irá pré-processar automaticamente colunas char/bool e treinar um RandomForestClassifier.")
-
 X_proc, y_enc, encoders, target_le = preprocess(df, TARGET_COL)
 
 test_size = st.slider("Tamanho do conjunto de teste (%)", 5, 50, 20)
@@ -149,16 +137,16 @@ else:
     else:
         st.info("Clique em 'Treinar modelo agora' para treinar com os hiperparâmetros acima.")
 
-# Inputs para previsão
+# Sidebar inputs for prediction
 if 'model' in st.session_state:
     model = st.session_state['model']
     user_inputs = build_sidebar_inputs(df, encoders)
 
-    if st.button("Prever cogumelo"):
-        feature_vec = [user_inputs[c] if c in user_inputs else 0 for c in FEATURE_COLUMNS]
+    if st.button("Prever cogumelo"):  # Previsão só quando clicar
+        feature_vec = [user_inputs[c] if c in user_inputs else 0 for c in X_proc.columns]
         feature_arr = np.array(feature_vec).reshape(1, -1)
         pred = model.predict(feature_arr)[0]
-        proba = model.predict_proba(feature_arr)[0] if hasattr(model,"predict_proba") else None
+        proba = model.predict_proba(feature_arr)[0] if hasattr(model, "predict_proba") else None
         pred_label = target_le.inverse_transform([pred])[0]
 
         st.subheader("Resultado da previsão")
