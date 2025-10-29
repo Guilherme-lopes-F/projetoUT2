@@ -196,4 +196,4 @@ with st.form(key='mushroom_form'):
                  ('Bege / buff','b'),('Verde / green','r')],
         format_func=lambda x: x[0]
     )
-    q['stalk-shape'] = st.radio("11) Formato do caule (stalk-shape)", options=[('Alargado na base / enlargi]()
+    q['stalk-shape'] = st.radio("11) Formato do caule (stalk-shape)", options=[('Alargado na base / enlargi)]()
