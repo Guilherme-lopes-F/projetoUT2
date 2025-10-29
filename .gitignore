@@ -1,0 +1,6 @@
+.venv/
+venv/
+*.py[cod]
+.ipynb_checkpoints/
+.vscode/
+rf_model.joblib
