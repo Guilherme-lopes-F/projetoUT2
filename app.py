@@ -96,8 +96,8 @@ except FileNotFoundError as e:
     st.error(str(e))
     st.stop()
 
-st.subheader("Amostra dos dados (5 primeiras linhas)")
-st.dataframe(df.head())
+st.subheader("Amostra dos dados (10 primeiras linhas)")
+st.dataframe(df.head(10))
 
 with st.expander("Visão geral das colunas e tipos"):
     info = pd.DataFrame({
@@ -138,26 +138,30 @@ else:
         st.info("Clique em 'Treinar modelo agora' para treinar com os hiperparâmetros acima.")
 
 # Inputs para previsão
+# Inputs para previsão com botão
 if 'model' in st.session_state:
     model = st.session_state['model']
     user_inputs = build_sidebar_inputs(df, encoders)
-    feature_vec = [user_inputs[c] if c in user_inputs else 0 for c in X_proc.columns]
-    feature_arr = np.array(feature_vec).reshape(1, -1)
-    pred = model.predict(feature_arr)[0]
-    proba = model.predict_proba(feature_arr)[0] if hasattr(model,"predict_proba") else None
-    pred_label = target_le.inverse_transform([pred])[0]
-    
-    st.subheader("Resultado da previsão")
-    if pred_label.lower().startswith('e'):
-        st.success(f"🍽️ Previsto: COMESTÍVEL (label = {pred_label})")
-    else:
-        st.error(f"☠️ Previsto: VENENOSO (label = {pred_label})")
-    
-    if proba is not None:
-        prob_df = pd.DataFrame({'classe': target_le.classes_, 'probabilidade': proba})
-        st.table(prob_df)
+
+    if st.button("Prever cogumelo"):
+        feature_vec = [user_inputs[c] if c in user_inputs else 0 for c in X_proc.columns]
+        feature_arr = np.array(feature_vec).reshape(1, -1)
+        pred = model.predict(feature_arr)[0]
+        proba = model.predict_proba(feature_arr)[0] if hasattr(model,"predict_proba") else None
+        pred_label = target_le.inverse_transform([pred])[0]
+
+        st.subheader("Resultado da previsão")
+        if pred_label.lower().startswith('e'):
+            st.success(f"🍽️ Previsto: COMESTÍVEL (label = {pred_label})")
+        else:
+            st.error(f"☠️ Previsto: VENENOSO (label = {pred_label})")
+
+        if proba is not None:
+            prob_df = pd.DataFrame({'classe': target_le.classes_, 'probabilidade': proba})
+            st.table(prob_df)
 else:
     st.info("Treine o modelo primeiro para habilitar previsões.")
+
 
 st.markdown("""---
 **Notas:**  
