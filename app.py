@@ -8,28 +8,36 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
 import numpy as np
 
+# ---------------------------------------------
+# CONFIGURAÇÕES INICIAIS
+# ---------------------------------------------
 DATA_PATH = "mushroom.csv"
 TARGET_COL = "class"
 
-st.set_page_config(page_title="Mushroom IA - Classificação", layout="wide")
+st.set_page_config(page_title="🍄 Mushroom IA", layout="wide")
 
-st.title("🍄 Mushroom IA — Previsão: Comestível ou Venenoso")
+st.title("🍄 Mushroom IA — Classificação de Cogumelos")
 st.markdown(
-    "Este app carrega um dataset de cogumelos (`mushroom.csv`), "
-    "treina um modelo e permite prever se um cogumelo é **comestível (e)** ou **venenoso (p)**."
+    "Treine um modelo de **Machine Learning** para prever se um cogumelo é "
+    "**comestível (e)** ou **venenoso (p)** com base em 10 características."
 )
 
-# ---------------------------------------------------------
-# Funções auxiliares
-# ---------------------------------------------------------
+# ---------------------------------------------
+# FUNÇÃO PARA CARREGAR DADOS
+# ---------------------------------------------
 @st.cache_data
 def load_data(path=DATA_PATH):
     if not os.path.exists(path):
-        raise FileNotFoundError(f"Arquivo '{path}' não encontrado. Coloque o CSV na pasta do projeto.")
-    # 👇 CORREÇÃO: dataset separado por tabulação (\t)
-    df = pd.read_csv(path, sep="\t")
+        raise FileNotFoundError(f"O arquivo '{path}' não foi encontrado.")
+    try:
+        df = pd.read_csv(path, sep="\t")  # tenta com tab
+    except Exception:
+        df = pd.read_csv(path, sep=",")   # tenta com vírgula se falhar
     return df
 
+# ---------------------------------------------
+# FUNÇÕES AUXILIARES
+# ---------------------------------------------
 def is_boolean_like(series):
     unique = set(series.dropna().unique())
     bool_like_sets = [
@@ -49,56 +57,37 @@ def preprocess(df, target_col=TARGET_COL):
 
     for col in X.columns:
         ser = X[col]
-        if is_boolean_like(ser):
-            mapping_vals = {
-                True: 1, False: 0, 'True': 1, 'False': 0, 'true': 1, 'false': 0,
-                't': 1, 'f': 0, 'y': 1, 'n': 0, 'yes': 1, 'no': 0, '1': 1, '0': 0
-            }
-            X_proc[col] = ser.map(mapping_vals).fillna(0).astype(int)
-        else:
-            le = LabelEncoder()
-            X_proc[col] = le.fit_transform(ser.astype(str))
-            encoders[col] = le
+        le = LabelEncoder()
+        X_proc[col] = le.fit_transform(ser.astype(str))
+        encoders[col] = le
 
     target_le = LabelEncoder()
     y_enc = target_le.fit_transform(y.astype(str))
     return X_proc, y_enc, encoders, target_le
 
 def build_sidebar_inputs(df, encoders):
-    st.sidebar.header("🧪 Características do cogumelo para prever")
+    st.sidebar.header("🧩 Características do cogumelo")
     inputs = {}
     X = df.drop(columns=[TARGET_COL])
     for col in X.columns:
-        ser = X[col]
-        if is_boolean_like(ser):
-            val = st.sidebar.checkbox(f"{col}", value=False)
-            inputs[col] = int(val)
-        else:
-            uniques = sorted(list(ser.dropna().unique()))
-            choice = st.sidebar.selectbox(f"{col}", options=uniques, index=0)
-            if col in encoders:
-                enc = encoders[col]
-                try:
-                    transformed = int(enc.transform([str(choice)])[0])
-                except Exception:
-                    transformed = 0
-            else:
-                transformed = 0
-            inputs[col] = transformed
+        uniques = sorted(list(df[col].dropna().unique()))
+        choice = st.sidebar.selectbox(f"{col}", options=uniques, index=0)
+        enc = encoders[col]
+        inputs[col] = int(enc.transform([str(choice)])[0])
     return inputs
 
-# ---------------------------------------------------------
-# Carregar dataset
-# ---------------------------------------------------------
+# ---------------------------------------------
+# CARREGAR DATASET
+# ---------------------------------------------
 try:
     df = load_data()
 except FileNotFoundError as e:
     st.error(str(e))
     st.stop()
 
-# Mantém apenas as colunas relevantes
+# Colunas usadas
 SELECTED_COLS = [
-    "bruises", 
+    "bruises",
     "odor",
     "gill-size",
     "gill-color",
@@ -118,88 +107,77 @@ if missing:
 
 df = df[SELECTED_COLS]
 
-st.subheader("📊 Amostra dos dados (5 primeiras linhas)")
-st.dataframe(df.head())
+# ---------------------------------------------
+# EXIBIR DADOS
+# ---------------------------------------------
+st.subheader("📊 Amostra dos dados")
+st.dataframe(df.head(10))
 
-with st.expander("📋 Visão geral das colunas e tipos"):
-    info = pd.DataFrame({
-        'coluna': df.columns,
-        'tipo': [str(t) for t in df.dtypes],
-        'valores_únicos': [df[c].nunique() for c in df.columns]
-    })
-    st.dataframe(info)
+fig = px.histogram(df, x="class", title="Distribuição da variável alvo (class)")
+st.plotly_chart(fig, use_container_width=True)
 
-if TARGET_COL in df.columns:
-    fig = px.histogram(df, x=TARGET_COL, title="Distribuição da variável alvo (class)")
-    st.plotly_chart(fig, use_container_width=True)
-
-# ---------------------------------------------------------
-# Treinamento
-# ---------------------------------------------------------
-st.subheader("⚙️ Treinamento do modelo")
-st.markdown(
-    "O app pré-processa automaticamente as colunas selecionadas e treina um **RandomForestClassifier** balanceado."
-)
-
+# ---------------------------------------------
+# TREINAMENTO
+# ---------------------------------------------
+st.subheader("⚙️ Treinar Modelo")
 X_proc, y_enc, encoders, target_le = preprocess(df, TARGET_COL)
 
 test_size = st.slider("Tamanho do conjunto de teste (%)", 5, 50, 20)
-X_train, X_test, y_train, y_test = train_test_split(
-    X_proc, y_enc, test_size=test_size/100.0, random_state=42, stratify=y_enc
-)
-
-n_estimators = st.number_input("Número de árvores (n_estimators)", min_value=10, max_value=1000, value=100, step=10)
-max_depth = st.number_input("Max depth (0 = None)", min_value=0, max_value=100, value=0, step=1)
+n_estimators = st.number_input("Número de árvores (n_estimators)", 10, 500, 100, 10)
+max_depth = st.number_input("Profundidade máxima (0 = None)", 0, 100, 0, 1)
 
 if st.button("🚀 Treinar modelo agora"):
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_proc, y_enc, test_size=test_size/100, random_state=42, stratify=y_enc
+    )
+
     rf = RandomForestClassifier(
         n_estimators=n_estimators,
         max_depth=(None if max_depth == 0 else int(max_depth)),
-        random_state=42,
-        class_weight='balanced'
+        class_weight="balanced",
+        random_state=42
     )
+
     rf.fit(X_train, y_train)
     preds = rf.predict(X_test)
     acc = accuracy_score(y_test, preds)
-    st.success(f"Treinado! ✅ Acurácia no teste: {acc:.4f}")
+
+    st.success(f"✅ Modelo treinado com sucesso! Acurácia: {acc:.4f}")
     st.text("Relatório de classificação:")
     st.text(classification_report(y_test, preds, target_names=target_le.classes_, zero_division=0))
-    st.session_state['model'] = rf
-else:
-    if 'model' in st.session_state:
-        st.info("Modelo carregado da sessão anterior.")
-    else:
-        st.info("Clique em 'Treinar modelo agora' para treinar com os parâmetros acima.")
 
-# ---------------------------------------------------------
-# Previsão
-# ---------------------------------------------------------
-if 'model' in st.session_state:
-    model = st.session_state['model']
+    st.session_state["model"] = rf
+    st.session_state["encoders"] = encoders
+    st.session_state["target_le"] = target_le
+else:
+    st.info("Clique no botão acima para treinar o modelo.")
+
+# ---------------------------------------------
+# PREVISÃO
+# ---------------------------------------------
+if "model" in st.session_state:
+    st.subheader("🔮 Previsão de Novo Cogumelo")
+    model = st.session_state["model"]
+    encoders = st.session_state["encoders"]
+    target_le = st.session_state["target_le"]
+
     user_inputs = build_sidebar_inputs(df, encoders)
 
-    if st.button("🔮 Prever cogumelo"):
-        feature_vec = [user_inputs[c] if c in user_inputs else 0 for c in X_proc.columns]
-        feature_arr = np.array(feature_vec).reshape(1, -1)
-        pred = model.predict(feature_arr)[0]
-        proba = model.predict_proba(feature_arr)[0] if hasattr(model, "predict_proba") else None
+    if st.button("🍄 Prever"):
+        feature_vec = np.array([user_inputs[c] for c in df.drop(columns=[TARGET_COL]).columns]).reshape(1, -1)
+        pred = model.predict(feature_vec)[0]
+        proba = model.predict_proba(feature_vec)[0]
+
         pred_label = target_le.inverse_transform([pred])[0]
-
-        st.subheader("🧩 Resultado da previsão")
-        if pred_label.lower().startswith('e'):
-            st.success(f"🍽️ Previsto: **COMESTÍVEL** (label = {pred_label})")
+        if pred_label == "e":
+            st.success(f"🍽️ Previsto: COMESTÍVEL ({pred_label})")
         else:
-            st.error(f"☠️ Previsto: **VENENOSO** (label = {pred_label})")
+            st.error(f"☠️ Previsto: VENENOSO ({pred_label})")
 
-        if proba is not None:
-            prob_df = pd.DataFrame({'classe': target_le.classes_, 'probabilidade': proba})
-            st.table(prob_df)
+        st.write("📊 Probabilidades:")
+        st.dataframe(pd.DataFrame({
+            "Classe": target_le.classes_,
+            "Probabilidade": np.round(proba, 4)
+        }))
 else:
     st.info("Treine o modelo primeiro para habilitar previsões.")
-
-st.markdown("""---  
-**Notas:**  
-- O app lê CSV separado por **tabulação (`\t`)**.  
-- Colunas categóricas são convertidas automaticamente.  
-- O modelo é balanceado (`class_weight='balanced'`) para prever melhor os venenosos.  
-""")
