@@ -16,7 +16,7 @@ st.markdown("Use o formulário abaixo para informar características do cogumelo
 
 def load_data(path=DATA_PATH):
     if not os.path.exists(path):
-        st.error(f\"Arquivo '{path}' não encontrado. Coloque o CSV na pasta do projeto.\")
+        st.error(f"Arquivo '{path}' não encontrado. Coloque o CSV na pasta do projeto.")
         st.stop()
     return pd.read_csv(path)
 
