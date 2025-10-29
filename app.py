@@ -19,7 +19,7 @@ st.set_page_config(page_title="🍄 Mushroom IA", layout="wide")
 st.title("🍄 Mushroom IA — Classificação de Cogumelos")
 st.markdown(
     "Treine um modelo de **Machine Learning** para prever se um cogumelo é "
-    "**comestível (e)** ou **venenoso (p)** com base em 10 características."
+    "**comestível (e)** ou **venenoso (p)** com base em todas as colunas do CSV."
 )
 
 # ---------------------------------------------
@@ -85,35 +85,10 @@ except FileNotFoundError as e:
     st.error(str(e))
     st.stop()
 
-# Colunas usadas
-SELECTED_COLS = [
-    "bruises",
-    "odor",
-    "gill-size",
-    "gill-color",
-    "stalk-shape",
-    "stalk-root",
-    "stalk-color-above-ring",
-    "spore-print-color",
-    "population",
-    "habitat",
-    "class"
-]
-
-missing = [c for c in SELECTED_COLS if c not in df.columns]
-if missing:
-    st.error(f"As seguintes colunas estão faltando no CSV: {missing}")
-    st.stop()
-
-df = df[SELECTED_COLS]
-
-# ---------------------------------------------
-# EXIBIR DADOS
-# ---------------------------------------------
 st.subheader("📊 Amostra dos dados")
 st.dataframe(df.head(10))
 
-fig = px.histogram(df, x="class", title="Distribuição da variável alvo (class)")
+fig = px.histogram(df, x=TARGET_COL, title="Distribuição da variável alvo (class)")
 st.plotly_chart(fig, use_container_width=True)
 
 # ---------------------------------------------
