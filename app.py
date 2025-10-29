@@ -8,17 +8,15 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import classification_report, accuracy_score
 import numpy as np
 
-# Caminho do dataset e nome da coluna-alvo
 DATA_PATH = "mushroom.csv"
 TARGET_COL = "class"
 
-# Configuração da página
 st.set_page_config(page_title="Mushroom IA - Classificação", layout="wide")
 
 st.title("🍄 Mushroom IA — Previsão: Comestível ou Venenoso")
 st.markdown(
     "Este app carrega um dataset de cogumelos (`mushroom.csv`), "
-    "treina um modelo de IA e permite prever se um cogumelo é **comestível (e)** ou **venenoso (p)**."
+    "treina um modelo e permite prever se um cogumelo é **comestível (e)** ou **venenoso (p)**."
 )
 
 # ---------------------------------------------------------
@@ -28,7 +26,8 @@ st.markdown(
 def load_data(path=DATA_PATH):
     if not os.path.exists(path):
         raise FileNotFoundError(f"Arquivo '{path}' não encontrado. Coloque o CSV na pasta do projeto.")
-    df = pd.read_csv(path)
+    # 👇 CORREÇÃO: dataset separado por tabulação (\t)
+    df = pd.read_csv(path, sep="\t")
     return df
 
 def is_boolean_like(series):
@@ -97,7 +96,7 @@ except FileNotFoundError as e:
     st.error(str(e))
     st.stop()
 
-# Mantém apenas as colunas selecionadas
+# Mantém apenas as colunas relevantes
 SELECTED_COLS = [
     "bruises", 
     "odor",
@@ -200,7 +199,7 @@ else:
 
 st.markdown("""---  
 **Notas:**  
-- O app detecta automaticamente colunas boolean-like e as converte para 0/1.  
-- Colunas categóricas são codificadas com LabelEncoder.  
+- O app lê CSV separado por **tabulação (`\t`)**.  
+- Colunas categóricas são convertidas automaticamente.  
 - O modelo é balanceado (`class_weight='balanced'`) para prever melhor os venenosos.  
 """)
